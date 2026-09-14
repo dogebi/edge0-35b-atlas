@@ -347,16 +347,16 @@ const EXP={
  storage:{title:'Where 71.9 GB goes, and what survives int4.',body:'Virtually all of it is expert mass. Flip the mode and watch the same architecture re-price itself: FP8 halves it, the edge build takes it to a quarter — and the two adapters together are 180 MB, 0.9% of the edge checkpoint.'},
  cache:{title:'Ten caches that grow, thirty that do not.',body:'Full-attention layers keep a KV cache at 2 heads × 256 dims; the thirty gated-linear layers keep a fixed recurrent state whose size does not depend on the context. That is the whole reason a 262,144-token model can run from storage on a phone.'}
 };
-const BENCH=[
- {name:'MMLU Pro',capability:'Knowledge',values:[76.2,80.1]},
- {name:'GPQA Diamond',capability:'Science',values:[68.4,73.5]},
- {name:'MATH',capability:'Math',values:[88.1,93.0]},
- {name:'LiveCodeBench v6',capability:'Coding',values:[61.7,68.9]},
- {name:'BFCL v3',capability:'Tool use',values:[65.2,70.4]},
- {name:'RULER 128k',capability:'Long context',values:[83.6,88.2]},
- {name:'MMMU',capability:'Vision (base only)',values:[68.9,73.1]}
-];
-const BENCH_MODELS=['Edge0-35B-A3B int4','Qwen3.6-35B-A3B fp16'];
+const BENCH=[['GPQA Diamond','Reasoning',[93.4,94.1,92.9,88.1,92.4,89.9,90.9]],['Terminal-Bench 2.1','Agentic',[89.1,88.8,88.3,88.2,87.9,82.7,90.6]],['Terminal-Bench 3.0','Agentic',[43.3,34.4,17.7,28.3,11.8,7.6,30]],['Terminal-Bench 4.0','Agentic',[51.8,39.9,12.6,37.9,12.4,7,31.2]],['DeepSWE v1.1','Agentic',[74,73,67.5,66.9,62.7,54.4,74.2]],['ProgramBench','Agentic',[37,23,17.5,19,15.5,null,20.3]],['NL2Repo-Bench','Agentic',[75.3,56.8,58,58,61.5,54.2,64]],['CyberGym','Agentic',[null,84.5,80,84.5,83.3,76.7,88.1]],['SEC-Bench Pro','Agentic',[null,74.3,null,null,56.4,30.9,62.8]],['ExploitGym','Agentic',[22.1,33.7,null,15,5.4,1.8,15.3]],['HLE with tools','Agentic',[63.6,null,59.8,62.5,60,51.5,63.9]],['AutomationBench','Agentic',[50.3,45.8,46.7,48.8,43.2,37.7,54.8]],['Agent\'s Last Exam','Agentic',[28.6,26.7,27.6,28.5,25.7,25.2,31.8]],['Chartography with tools','Visual',[84,79.9,68.1,null,null,null,78.9]],['BabyVision with tools','Visual',[94.1,88.9,85.7,null,null,null,89.6]],['ZeroBench-main (Pass@5)','Visual',[52,53,41,null,null,null,49]]];
+const BENCH_MODELS=['Opus-5.0','GPT-5.6 Sol','K3','GLM-5.3','DS V4 Pro','DS V4 Flash','DS V4.1 Flash'];
+/* Publisher-reported leaderboard as published on the original atlas page (each model's
+   own card). Edge0-35B-A3B publishes no scores in the card this build reads, so this page shows
+   the set as published and claims nothing of its own. */
+
+/* Publisher-reported leaderboard as published on the original atlas page (each model's
+   own card). Edge0-35B-A3B publishes no scores in the card this build reads, so this page shows
+   the set as published and claims nothing of its own. */
+
 function pickExperts(seed,n=256,k=8){let x=(seed+1)*2654435761>>>0;const s=new Set;while(s.size<k){x=(Math.imul(x,1664525)+1013904223)>>>0;s.add(x%n);}return [...s].sort((a,b)=>a-b);}
 const PHASES=[
  {name:'Route',label:'Route',from:0,to:6,active:'8 of 256',color:COL.router,caption:'The router picks, the prerouter guesses ahead.',desc:'Each token hits the router (256 logits) and the top 8 experts are chosen. The trained prerouter runs one step ahead of the forward pass, so the expert fetch for layer N+1 starts while layer N is still computing.'},
