@@ -244,6 +244,19 @@ def check(atlas: Path) -> None:
         pass
     report("sumB(ALL_W" in body, "totals are derived from the data half")
 
+    # 12: the DOM must stay still while a form control has focus (open dropdown flicker / "dies")
+    tick = re.search(r"tick:time=>\{[^}]{0,240}setState\(\{time\}\)", body)
+    if not tick:
+        report(True, "tick callback pauses DOM updates while a form control is focused",
+               "no engine tick handler in this page — nothing to guard")
+    else:
+        window = body[tick.start():tick.start() + 320]
+        guarded = ("document.activeElement" in window
+                   and re.search(r"INPUT\|SELECT\|TEXTAREA", window) is not None)
+        report(guarded, "tick callback pauses DOM updates while a form control is focused",
+               "" if guarded else "tick:time=> still calls setState({time}) unguarded — an open "
+                                  "<select> will flicker; add the document.activeElement guard")
+
     # 11: every palette key the engine reads must be defined in the data half
     palette_problems: list[str] = []
     for name in ("COL", "TC"):
