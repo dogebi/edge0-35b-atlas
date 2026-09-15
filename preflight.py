@@ -191,6 +191,9 @@ def check(atlas: Path) -> None:
             bad_loops.append(f"L{base}..L{base+length-1} with {nlayers} layers")
     report(not bad_loops, "dynamic id loops stay inside the layer count", "; ".join(bad_loops))
 
+    ok_js, js_detail = script_syntax_ok(text)
+    report(ok_js, "the page's script parses (node --check)", js_detail)
+
     # 5: identifiers the rewritten panels use must be defined somewhere
     # Constants the engine interpolates (${...}) must exist in the data half.
     # This targets the real failure mode — a panel referencing NV_DELTA / KV_FULL_PER_TOKEN that
@@ -214,6 +217,12 @@ def check(atlas: Path) -> None:
                 k += 1
         k += 1
     used = set(re.findall(r"(?<![.\w])([A-Z][A-Z0-9_]{3,})\b", code_only(interpolated)))
+    # A word that only ever shows up inside a quoted label ("'ACTIVE / TOKEN'") is prose, not a
+    # constant: drop it, so a real rename (NV_DELTA) still fails while labels do not.
+    prose = set()
+    for q in re.findall(r"'[^']*'|\"[^\"]*\"", text):
+        prose |= set(re.findall(r"[A-Z][A-Z0-9_]{3,}", q))
+    used -= prose
     defined = set(re.findall(r"\b(?:const|let|var|function)\s+([A-Za-z_$][\w$]*)", text))
     defined |= {"MODE_KEYS", "MODE_INFO", "CATEGORIES", "TOTALS", "TOTAL_P", "MODULES", "ALL_W",
                 "LAYERS", "EMBED", "HEAD", "VISION", "ALIGNER", "SELF", "DRAFT", "AUX_TABLES"}
@@ -273,6 +282,34 @@ def check(atlas: Path) -> None:
            "; ".join(palette_problems))
 
 
+def script_syntax_ok(page_text: str) -> tuple[bool, str]:
+    """Parse the page's inline script with node, if node exists.
+
+    A page can pass every structural check and still be dead in the browser: one stray backslash
+    inside a panel template ('\\'') is a SyntaxError, the module never evaluates, and the 3D view
+    stays empty with no console error from the app itself. Only a real parser catches that.
+    """
+    import shutil
+    import subprocess
+    import tempfile
+    node = shutil.which("node")
+    if not node:
+        return True, "node not installed"
+    scripts = re.findall(r"<script[^>]*>(.*?)</script>", page_text, re.S)
+    if not scripts:
+        return True, "no inline script"
+    body = max(scripts, key=len)
+    with tempfile.TemporaryDirectory() as td:
+        f = Path(td) / "page.js"
+        f.write_text(body, encoding="utf-8")
+        r = subprocess.run([node, "--check", str(f)], capture_output=True, text=True)
+    if r.returncode == 0:
+        return True, ""
+    detail = (r.stderr or r.stdout).strip().splitlines()
+    return False, (detail[0] if detail else "node --check failed") + "  ::  " + (detail[4] if len(detail) > 4 else "")
+
+
+
 SELFTEST_PAGE = """<!doctype html><html><head></head><body><div id="root"></div>
 <script>
 const MODE_KEYS=['bf16','fp8'];
@@ -285,6 +322,9 @@ const CATEGORIES=[
 ];
 const LAYERS=Array.from({length:30},(_,i)=>({id:'L'+i,mode:i<10?'full':'swa'}));
 const TOTALS={bf16:1,fp8:1};
+const COL={blue:'#fff',enc:'#fff',dec:'#fff',auxa:'#fff',vocab:'#fff',norm:'#fff'};
+class CanvasRenderer{constructor(){this.software=false;}}
+const KV_FULL_PER_TOKEN=1152;
 const ALL_W=[];
 const sumB=(ws,m)=>1;
 function x(){return 1;}
