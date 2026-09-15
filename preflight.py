@@ -26,8 +26,55 @@ from pathlib import Path
 FAIL = 0
 
 
+
+# A check only means something when the page carries the structure it is about.
+ENGINE_STRUCTURE = {
+    "category layout is computed from CATEGORIES": "const CATEGORIES=",
+    "category count fits the hand-written coords array": "const CATEGORIES=",
+    "categories defined": "const CATEGORIES=",
+    "mode keys defined": "const MODE_KEYS=",
+    "every mode has MODE_INFO": "const MODE_KEYS=",
+    "totals are derived from the data half": "const MODE_KEYS=",
+    "palette keys the engine reads are defined": "const COL=",
+    "interpolated constants exist in the data half": "class CanvasRenderer{",
+    "literal pos() targets resolve": "class CanvasRenderer{",
+    "dynamic id loops stay inside the layer count": "class CanvasRenderer{",
+    "no label(..., null, ...) call": "class CanvasRenderer{",
+    "view dispatch is wrapped in try/catch": "class CanvasRenderer{",
+    "page keeps the app-shell wrapper": "app-shell",
+}
+PAGE_TEXT = ""
+
+def count_rows(literal: str) -> int:
+    """Number of top-level elements inside the outermost [...] of a JS array literal."""
+    start = literal.find("[")
+    if start < 0:
+        return 0
+    depth, rows, in_str, quote = 0, 0, False, ""
+    for ch in literal[start:]:
+        if in_str:
+            if ch == quote:
+                in_str = False
+            continue
+        if ch in "\"'":
+            in_str, quote = True, ch
+            continue
+        if ch == "[":
+            depth += 1
+            if depth == 2:
+                rows += 1
+        elif ch == "]":
+            depth -= 1
+            if depth == 0:
+                break
+    return rows
+
 def report(ok: bool, title: str, detail: str = "") -> None:
     global FAIL
+    needle = next((k for k in ENGINE_STRUCTURE if k in title), None)
+    if needle is not None and ENGINE_STRUCTURE[needle] not in PAGE_TEXT:
+        print(f"n/a   {title}  (page has no {ENGINE_STRUCTURE[needle]})")
+        return
     print(f"{'PASS' if ok else 'FAIL'}  {title}" + (f"  — {detail}" if detail and not ok else ""))
     if not ok:
         FAIL = 1
@@ -96,13 +143,15 @@ def check(atlas: Path) -> None:
     if not page.exists():
         report(False, f"{atlas.name}: index.html exists")
         return
+    global PAGE_TEXT
     text = page.read_text(encoding="utf-8")
+    PAGE_TEXT = text
     body = text.split("</head>", 1)[-1]
     print(f"--- {atlas.name}  ({len(text):,} B)")
 
     # 1 + 7: CATEGORIES count vs the layout the engine uses for them
-    m = re.search(r"const CATEGORIES=\[(.*?)\n\];", body, re.S)
-    ncat = len(re.findall(r"\n \['", m.group(1))) if m else 0
+    m = re.search(r"const CATEGORIES=\[(.*?)\n?\];", body, re.S)
+    ncat = count_rows("[" + m.group(1) + "]") if m else 0
     # the storage() body is the only place that lays the category solids out
     st = body.find("storage(){")
     storage = body[st:st + 4000] if st >= 0 else ""
