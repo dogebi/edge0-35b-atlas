@@ -814,6 +814,21 @@ def main() -> int:
             if r.returncode != 0:
                 print("PREFLIGHT FAILED — index.html NOT written", file=sys.stderr)
                 return 7
+    # WebMCP tools: webmcp-tools.js 를 자리표시자에 인라인 주입(외부 스크립트 미사용 → CSP 원문 유지)
+    _wm = DIR / "webmcp-tools.js"
+    if "@@WEBMCP@@" in text:
+        if not _wm.exists():
+            print("RESIDUE FAIL: webmcp-tools.js missing", file=sys.stderr)
+            return 9
+        _code = _wm.read_text(encoding="utf-8").rstrip() + "\n"
+        if "</script" in _code.lower():
+            print("RESIDUE FAIL: webmcp-tools.js contains </script", file=sys.stderr)
+            return 9
+        text = text.replace("@@WEBMCP@@", _code)
+        if "@@WEBMCP@@" in text:
+            print("RESIDUE FAIL: WebMCP placeholder not fully replaced", file=sys.stderr)
+            return 9
+        print(f"webmcp · inlined {len(_code):,} B of tools")
     OUT.write_text(text, encoding="utf-8")
     print(f"wrote {OUT.name} · {len(text):,} B")
 
